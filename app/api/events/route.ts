@@ -1,61 +1,75 @@
 import { NextRequest, NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
+import { auth } from "@/lib/auth";
 import { connectDB } from "@/lib/db";
 import { EventModel } from "@/models/Event";
-import { UserModel } from "@/models/User";
 import { RegistrationModel } from "@/models/Registration";
-import { checkRegistrationOpen } from "@/lib/utils";
+import { makeSlug } from "@/lib/utils";
 
-export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET() {
   try {
-    const { id } = await params;
-    const { name, email, password } = await req.json();
-    if (!name || !email || !password)
-      return NextResponse.json({ error: "All fields required." }, { status: 400 });
-    if (password.length < 6)
-      return NextResponse.json({ error: "Password must be at least 6 characters." }, { status: 400 });
     await connectDB();
-    const event = await EventModel.findById(id).lean();
-    if (!event) return NextResponse.json({ error: "Event not found." }, { status: 404 });
-    const regCount = await RegistrationModel.countDocuments({ eventId: event._id, cancelledAt: null });
-    const isOpen = checkRegistrationOpen({
-      isClosed: event.isClosed,
-      cutoffDate: event.cutoffDate,
-      capacity: event.capacity,
-      registrationCount: regCount,
-      date: event.date,
-    });
-    if (!isOpen)
-      return NextResponse.json({ error: "Registrations are closed." }, { status: 403 });
-    const normalizedEmail = email.toLowerCase().trim();
-    let user = await UserModel.findOne({ email: normalizedEmail });
-    if (!user) {
-      const hashed = await bcrypt.hash(password, 12);
-      user = await UserModel.create({
-        name: name.trim(),
-        email: normalizedEmail,
-        password: hashed,
-        role: "attendee",
-      });
-    }
-    const existing = await RegistrationModel.findOne({ eventId: event._id, attendeeId: user._id });
-    if (existing) {
-      if (existing.cancelledAt) {
-        existing.cancelledAt = null;
-        await existing.save();
-        return NextResponse.json({ success: true });
-      }
-      return NextResponse.json({ error: "You are already registered." }, { status: 409 });
-    }
-    await RegistrationModel.create({
-      eventId: event._id,
-      attendeeId: user._id,
-      name: name.trim(),
-      email: normalizedEmail,
-    });
-    return NextResponse.json({ success: true }, { status: 201 });
+    const events = await EventModel.find({}).sort({ createdAt: -1 }).populate("hostId", "name").lean();
+    const counts = await RegistrationModel.aggregate([
+      { $match: { cancelledAt: null } },
+      { $group: { _id: "$eventId", count: { $sum: 1 } } },
+    ]);
+    const countMap = new Map(counts.map((c) => [c._id.toString(), c.count]));
+    return NextResponse.json(
+      events.map((ev) => ({
+        _id: ev._id.toString(),
+        title: ev.title,
+        slug: ev.slug,
+        description: ev.description,
+        date: ev.date,
+        time: ev.time,
+        location: ev.location,
+        capacity: ev.capacity,
+        cutoffDate: ev.cutoffDate,
+        isClosed: ev.isClosed,
+        registrationCount: countMap.get(ev._id.toString()) ?? 0,
+        hostName: (ev.hostId as { name?: string })?.name ?? "Unknown",
+        createdAt: ev.createdAt,
+      }))
+    );
   } catch (err) {
     console.error(err);
-    return NextResponse.json({ error: "Registration failed." }, { status: 500 });
+    return NextResponse.json({ error: "Failed to load events." }, { status: 500 });
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const session = await auth();
+    if (!session || session.user.role !== "host")
+      return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+
+    const { title, description, date, time, location, capacity, cutoffDate } = await req.json();
+
+    if (!title || !description || !date || !time || !location)
+      return NextResponse.json({ error: "Required fields missing." }, { status: 400 });
+
+    await connectDB();
+
+    let slug = makeSlug(title);
+    const exists = await EventModel.findOne({ slug });
+    if (exists) slug = `${slug}-${Math.random().toString(36).slice(2, 6)}`;
+
+    const event = await EventModel.create({
+      title: title.trim(),
+      slug,
+      description: description.trim(),
+      date,
+      time,
+      location: location.trim(),
+      capacity: capacity ? parseInt(capacity, 10) : null,
+      cutoffDate: cutoffDate || null,
+      isClosed: false,
+      hostId: session.user.id,
+    });
+
+    return NextResponse.json({ _id: event._id.toString(), slug: event.slug }, { status: 201 });
+  } catch (err) {
+    console.error(err);
+    return NextResponse.json({ error: "Failed to create event." }, { status: 500 });
   }
 }
