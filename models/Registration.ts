@@ -9,13 +9,41 @@ export interface RegistrationDocument extends Document {
   registeredAt: Date;
 }
 
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 const registrationSchema = new Schema<RegistrationDocument>(
   {
-    eventId: { type: Schema.Types.ObjectId, ref: "Event", required: true },
-    attendeeId: { type: Schema.Types.ObjectId, ref: "User", required: true },
-    name: { type: String, required: true, trim: true },
-    email: { type: String, required: true, lowercase: true, trim: true },
-    cancelledAt: { type: Date, default: null },
+    eventId: {
+      type: Schema.Types.ObjectId,
+      ref: "Event",
+      required: [true, "Event ID is required"],
+    },
+    attendeeId: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: [true, "Attendee ID is required"],
+    },
+    name: {
+      type: String,
+      required: [true, "Name is required"],
+      trim: true,
+      minlength: [2, "Name must be at least 2 characters"],
+      maxlength: [100, "Name cannot exceed 100 characters"],
+    },
+    email: {
+      type: String,
+      required: [true, "Email is required"],
+      lowercase: true,
+      trim: true,
+      validate: {
+        validator: (v: string) => emailRegex.test(v),
+        message: "Please provide a valid email address",
+      },
+    },
+    cancelledAt: {
+      type: Date,
+      default: null,
+    },
   },
   { timestamps: { createdAt: "registeredAt", updatedAt: false } }
 );

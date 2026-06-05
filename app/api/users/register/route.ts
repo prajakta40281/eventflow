@@ -12,6 +12,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid role." }, { status: 400 });
     if (password.length < 6)
       return NextResponse.json({ error: "Password must be at least 6 characters." }, { status: 400 });
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) return NextResponse.json({ error: "Please provide a valid email address." }, { status: 400 });
+    
     await connectDB();
     const existing = await UserModel.findOne({ email: email.toLowerCase().trim() });
     if (existing)
