@@ -1,0 +1,59 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-accent: #E85D26;
+  --color-accent-hover: #CC4D1A;
+  --color-accent-light: #FFF0EB;
+  --color-ink: #0D0D0D;
+  --color-ink-soft: #1A1A1A;
+  --color-ink-muted: #6B7280;
+  --color-paper: #F9F7F4;
+  --color-paper-warm: #F4F1EC;
+  --color-border: #E4E0D8;
+}
+
+@layer base {
+  html {
+    font-family: "DM Sans", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    background-color: #F9F7F4;
+    color: #0D0D0D;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded text-sm font-medium transition-all duration-150 cursor-pointer whitespace-nowrap no-underline border-0 outline-none;
+  }
+  .btn-primary {
+    @apply bg-accent text-white hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-secondary {
+    @apply bg-transparent text-ink border border-border hover:bg-paper-warm;
+  }
+  .btn-ghost {
+    @apply bg-transparent text-ink-muted hover:bg-paper-warm hover:text-ink;
+  }
+  .btn-danger {
+    @apply bg-transparent text-red-600 border border-red-200 hover:bg-red-50;
+  }
+  .btn-sm {
+    @apply px-3 py-1.5 text-xs;
+  }
+  .btn-lg {
+    @apply px-6 py-3 text-base;
+  }
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+  .badge-open {
+    @apply bg-green-100 text-green-700;
+  }
+  .badge-closed {
+    @apply bg-red-100 text-red-600;
+  }
+  .badge-past {
+    @apply bg-paper-warm text-ink-muted;
+  }
+}
